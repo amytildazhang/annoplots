@@ -1,0 +1,43 @@
+---
+title: "Creating annotatable plots: the 'annoplot' object"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{annoplot}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(annoshiny)
+library(ggplot2)
+```
+
+
+```{r}
+radon <- rstanarm::radon
+
+p_radon <- ggplot(radon, aes(x = log_radon, y = log_uranium)) +
+geom_point() 
+
+af_radon <- function(plots, pointdf) {
+    map(plots, ~. + geom_point(data = pointdf, color = 'red'))
+}
+
+AP_eff <- AnnoPlot$new(list(p_eff), df_eff, af_eff, annotype = "brush",
+                   plot_dims = list(c(2, 3)))
+
+
+
+sfp <- ggplot(sfdf, aes(x = p_n, y = sf)) + theme_bw() +
+    labs(y = "1 - Shrinkage factor", x = "Borrower cluster size")
+sfap <- AP_bg$new(sfp, geom_point, sfdf, plot_dims = list(c(1, 1.5)))
+
+```
+

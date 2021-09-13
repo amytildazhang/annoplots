@@ -1,55 +1,65 @@
 
+
+
 #' @export
 AnnoPlot <- R6::R6Class(
     "AnnoPlot",
 
     private = list(
-        .data = NULL
+        .data = NULL,
+        .add_idcol = function(df) {
+            if (!("id__" %in% colnames(df))) {
+                df$id__ <- 1:nrow(df)
+            }
+            df
+        }
     ),
     public = list(
         app_df = NULL,
-        plots = NULL,
-        anno_plots = NULL,
+        plot = NULL,
+        anno_plot = NULL,
         annotype = NULL,
         plot_dims = NULL,
-        n_plots = 1,
         annotation_function = NULL,
         id_col = NULL,
         hover_cols = NULL,
-        initialize = function(plots, data, annofun,
+        initialize = function(plot, plotdata, annofun, shinydata = NULL,
                               annotype = "brush",
                               plot_dims = c(), hover = c(), filterfun = NULL) {
-            if (checkmate::test_class(plots, "gg")) {
-                plots <- list(plots)
+            if (checkmate::test_class(plot, "gg")) {
+                plot <- list(plot)
             }
-            if (length(names(plots)) == 0) {
-                names(plots) <- sprintf("Plot %s", 1:length(plots))
+            if (length(names(plot)) == 0) {
+                names(plot) <- sprintf("Plot %s", 1:length(plot))
             }
-            self$plots <- plots
-            self$n_plots <- length(self$plots)
+            self$plot <- plot
             self$plot_dims <- purrr::map(plot_dims, ~list(height = .[1], width = .[2]))
 
             self$annotation_function <- annofun
-            self$annotype <- rep(annotype, self$n_plots)
+            self$annotype <- annotype
             self$hover_cols = hover
 
             if (!is.null(filterfun)) {
                 self$filter_points <- filterfun
             }
             # self$id_col = id_col
-
-            private$.data <- dplyr::ungroup(data)
+            private$.data <- private$.add_idcol(dplyr::ungroup(plotdata))
+            if (is.null(shinydata)) {
+                self$app_df <- private$.data
+            } else {
+                self$app_df <-  private$.add_idcol(dplyr::ungroup(shinydata))
+            }
 
             invisible(self)
         },
-        annotate_plots = function(points) {
+        annotate_plot = function(points) {
             if (length(points) > 0) {
-                self$anno_plots <- self$annotation_function(
-                    self$plots, self$filter_points(points)
+                self$anno_plot <- self$annotation_function(
+                    self$plot, self$filter_points(points)
                 )
 
             } else {
-                self$anno_plots <- self$plots
+                self$anno_plot <- self$plot
             }
             invisible(self)
         },
@@ -85,24 +95,12 @@ AnnoPlot <- R6::R6Class(
 )
 
 
-new_annoplot <- function(annofun,
-                         baseplots, data, annotype, plot_dims,
-                         hover, filterFun = NULL) {
-
-
-
-}
-
-#' @export
-validate_annoplot <- function() {
-
-}
 
 
 # Creates AnnoPlot objects
 #' @export
-AP_bg <-  R6::R6Class(
-    "AP_bg",
+AP_fade <-  R6::R6Class(
+    "AP_fade",
     inherit = AnnoPlot,
     private = list(
         .plot_skeleton = NULL,
@@ -139,31 +137,32 @@ AP_bg <-  R6::R6Class(
             }
 
 
-            p
+            p + theme(legend.position = 'none')
         },
-        .annotation_function = function(plots, pointdf) {
+        .annotation_function = function(plot, pointdf) {
             if (nrow(pointdf) == 0) {
-                plots
+                plot
             }
 
             purrr::map2(private$.plot_background, private$.plot_skeleton, function(bp, sp) {
-                overlay <- cowplot::draw_plot(
-                    sp +
-                        self$geomfn(alpha = 0) +
-                        ggplot2::theme(
-                            panel.background = ggplot2::element_rect(fill = "transparent"), # bg of the panel
-                            plot.background = ggplot2::element_rect(fill = "transparent", color = NA), # bg of the plot
-                            panel.grid.major = ggplot2::element_blank(), # get rid of major grid
-                            panel.grid.minor = ggplot2::element_blank(), # get rid of minor grid
-                            legend.background = ggplot2::element_rect(fill = "transparent"), # get rid of legend bg
-                            legend.box.background = ggplot2::element_rect(fill = "transparent") # get rid of legend panel bg
-                        ) +
-                        self$geomfn(data = pointdf) +
-                        ggplot2::geom_rug(data = pointdf, length = ggplot2::unit(0.05, "npc"), sides = "bl")
-                )
+                # overlay <- cowplot::draw_plot(
+                # sp +
+                #         self$geomfn(alpha = 0) +
+                #         ggplot2::theme(
+                #             panel.background = ggplot2::element_rect(fill = "transparent"), # bg of the panel
+                #             plot.background = ggplot2::element_rect(fill = "transparent", color = NA), # bg of the plot
+                #             panel.grid = ggplot2::element_blank() # get rid of gridlines
+                #             # panel.grid.minor = ggplot2::element_blank(), # get rid of minor grid
+                #             # legend.background = ggplot2::element_rect(fill = "transparent"), # get rid of legend bg
+                #             # legend.box.background = ggplot2::element_rect(fill = "transparent") # get rid of legend panel bg
+                #         ) +
+                #         self$geomfn(data = pointdf) +
+                # ggplot2::geom_rug(data = pointdf, length = ggplot2::unit(0.05, "npc"), sides = "bl")
+                # )
+                # cowplot::align_plot(bp, overlay, align="hv", axis="tblr")
 
-                bp + overlay
-
+                bp +
+                    self$geomfn(data = pointdf, size = 2.5)
 
 
             })
@@ -172,25 +171,26 @@ AP_bg <-  R6::R6Class(
     ),
     public = list(
         geomfn = NULL,
-        initialize = function(clearplots, geomfn, data,
-                              annotype = "brush", plot_dims = c()) {
+        initialize = function(clearplot, geomfn, plotdata, shinydata = NULL,
+                              annotype = "brush", ...) {
 
-            super$initialize(clearplots, data,
-                             annofun = NULL, annotype, plot_dims)
+            super$initialize(clearplot, plotdata,
+                             annofun = NULL, shinydata, annotype, ...)
             self$geomfn <- geomfn
             self$annotation_function <- private$.annotation_function
-            self$generate_plots(self$plots)
+            self$generate_plot(self$plot)
 
             invisible(self)
         },
-        generate_plots = function(clearplots, addwhite = 0.5, saturation = 0.7, ...) {
-            private$.plot_skeleton <- clearplots
-            self$plots <- purrr::map(clearplots, function(p) {
+        generate_plot = function(clearplot, addwhite = 0.25, saturation = 0.7, ...) {
+            private$.plot_skeleton <- clearplot
+            self$plot <- purrr::map(clearplot, function(p) {
                 p + self$geomfn(...)
             })
 
-            private$.plot_background <- purrr::map(clearplots, function(p) {
-                cowplot::ggdraw(private$.adjust_colors(p, addwhite, saturation))
+            private$.plot_background <- purrr::map(clearplot, function(p) {
+                # cowplot::ggdraw(private$.adjust_colors(p, addwhite, saturation))
+                p + self$geomfn(alpha = addwhite)
             })
 
 
@@ -206,3 +206,16 @@ AP_bg <-  R6::R6Class(
 
 
 
+#' @export
+annoplot <- function(plot, plotdata, annofun, appdata = NULL, annotype = "brush",
+                     dims = c(), hover = c(), filterFUN = NULL) {
+
+    AnnoPlot$new(plot, plotdata, annofun, appdata, annotype = annotype,
+                 plot_dims = dims, hover = hover, filterfun = filterFUN)
+}
+
+
+#' @export
+annoplot_fade <- function(plot, geom, plotdata, shinydata = NULL, annotype = "brush", ...) {
+    AP_fade$new(plot, geom, plotdata, shinydata, annotype, ...)
+}

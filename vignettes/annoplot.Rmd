@@ -15,29 +15,137 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup}
-library(annoshiny)
+library(shiny)
+library(annoplots)
 library(ggplot2)
+library(dplyr)
+library(purrr)
+
 ```
+
+# A minimal reproducible example
+
+This R package helps to create annotatable plots in rShiny. For example, after selecting points in a plot, you may wish to change them to a highlighted color, label them with relevant information, or zoom in on those points. This is done by the creation of a new [Shiny module](https://shiny.rstudio.com/articles/modules.html), `[MODULE NAME]`, which displays the plots and reads the points selected by the user, and an `AnnoPlot` object, which contains all plot-related data and annotates the plots. 
+
+
+Here I use the `mtcars` data set to create a single base plot:
+
+```{r}
+
+
+p_base <- ggplot(mtcars, aes(x = mpg, y = cyl)) + geom_point()
+p_base
+```
+
+
+
+
+When I select points from the base plot in the Shiny app, I want those points to turn red. I specify this using the annotation function which must take the arguments `plots` and `pointdf`. By passing the selected points as a dataframe in `pointdf`, I can specify which points to apply the annotation to.
+
+```{r}
+library(purrr)
+af_highlightred <- function(plots, pointdf) {
+    map(plots, ~. + geom_point(data = pointdf, color = 'red') )
+}
+
+# Take a random subset of points
+selected_points <- sample(1:nrow(mtcars), 3)
+pointdf <- mtcars[selected_points, ]
+
+af_highlightred(list(p_base), pointdf)
+
+```
+
+
+Or maybe I want to color the points red and label with the model of the car.
+
+```{r}
+library(ggrepel)
+
+mtcars_labeled <- mutate(mtcars, model = rownames(mtcars))
+pointdf <- mtcars_labeled[selected_points, ]
+
+
+af_highlightlabel <- function(plots, pointdf) {
+    map(plots, ~. + geom_point(data = pointdf, color = 'red') +
+          geom_text_repel(aes(label = model), data = pointdf))
+}
+
+af_highlightlabel(list(p_base), pointdf)
+```
+
+To create an object that the Shiny modules will recognize and be able to communicate with, I create an  `AnnoPlot` object which contains the base plot, annotation function, data, and other configurable options (see [annoplot link]).
+
+```{r}
+ap_mtcars <- annoplot(plots = list(p_base), 
+                      plotdata = mtcars_labeled, 
+                      annofun = af_highlightlabel) 
+# returns an `AnnoPlot` object
+```
+
+
+This is essentially a standardized wrapper around the actions we just did: displaying the base plot and carrying out the annotation function. 
+
+```{r}
+ap_plots(ap_mtcars) # returns the list of base plots
+ap_highlight(ap_mtcars, pointdf) # returns annotated plots
+ap_get(ap_mtcars, "annotype") # returns the 'annotype' option 
+ap_set(ap_mtcars, "annotype", "click") # user selects points by clicking them
+```
+
+
+This is then relayed to the AP [Shiny module](https://shiny.rstudio.com/articles/modules.html), which is called using two functions: 
+
+- `APOutput()`
+
+- `APServer()`
 
 
 ```{r}
-radon <- rstanarm::radon
-
-p_radon <- ggplot(radon, aes(x = log_radon, y = log_uranium)) +
-geom_point() 
-
-af_radon <- function(plots, pointdf) {
-    map(plots, ~. + geom_point(data = pointdf, color = 'red'))
-}
-
-AP_eff <- AnnoPlot$new(list(p_eff), df_eff, af_eff, annotype = "brush",
-                   plot_dims = list(c(2, 3)))
-
-
-
-sfp <- ggplot(sfdf, aes(x = p_n, y = sf)) + theme_bw() +
-    labs(y = "1 - Shrinkage factor", x = "Borrower cluster size")
-sfap <- AP_bg$new(sfp, geom_point, sfdf, plot_dims = list(c(1, 1.5)))
-
+# ui <- fluidPage(
+# 
+#   # App title ----
+#   titlePanel("A minimal AnnoPlot example"),
+#     # Main panel for displaying outputs ----
+#     mainPanel(
+# 
+#       # Output: Histogram ----
+#       plotOutput(id = "mtcars")
+# 
+#     )
+# )
+# 
+# 
+# server <- function(input, output) {
+#   points <- reactiveValues(pt_idx = c())
+#   selected <- APServer("mtcars", ap_mtcars,
+#                        reactive(c(input$button_go, input$button_clear)),
+#                        points, scale = 4, hover = T)
+#   
+#   
+#    observeEvent(selected(), {
+#         observe("points from top plots")
+#         print(top())
+#         points$pt_idx <- unique(c(points$pt_idx, top()))
+#     })
+# 
+# }
+# 
+# shinyApp(ui, server)
 ```
+
+
+
+
+# Updating multiple plots 
+
+
+
+# Communicating across multiple AP Shiny modules
+
+
+
+# Modifying the Shiny module for your own plots
+
+
 

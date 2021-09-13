@@ -1,4 +1,4 @@
-Package: annoshiny
+Package: annoplots
 Type: Package
 Title: What the Package Does (Title Case)
 Version: 0.1.0
@@ -10,6 +10,22 @@ License: What license is it under?
 Encoding: UTF-8
 LazyData: true
 Suggests: 
+    checkmate,
     knitr,
-    rmarkdown
+    rmarkdown,
+    rstanarm,
+    testthat
 VignetteBuilder: knitr
+RoxygenNote: 7.1.1
+Imports: 
+    R6,
+    magrittr,
+    shades,
+    ggplot2,
+    purrr,
+    cowplot,
+    shiny,
+    dplyr,
+    pryr,
+    rlang,
+    ggrepel

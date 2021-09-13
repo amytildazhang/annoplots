@@ -1,0 +1,151 @@
+---
+title: "Annotation function examples"
+pageteitle: "Annotation function examples"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{annofun_examples}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+options(rmarkdown.html_vignette.check_title = FALSE)
+```
+
+
+```{r setup}
+library(annoplots)
+library(tidyverse)
+theme_set(theme_bw(base_size = 13))
+```
+
+```{r data}
+mtcars_labeled <- mutate(mtcars, model = rownames(mtcars),
+                         gear = factor(gear), carb = factor(carb))
+set.seed(3872)
+selected_points <- sample(1:nrow(mtcars), 2)
+pointdf <- mtcars_labeled[selected_points, ]
+
+
+```
+
+# Creating annotation functions
+
+```{r}
+library(ggrepel)
+p_base_scatter <- ggplot(mtcars, aes(x = mpg, y = cyl)) + geom_point() +
+  labs(x = "Miles/Gallon", y = "Cylinders")
+
+
+af_highlightlabel <- function(plots, pointdf) {
+    map(plots, ~. + geom_point(data = pointdf, color = 'red') +
+          geom_text_repel(aes(label = model), data = pointdf, size = 3))
+}
+
+ap_scatter <- af_highlightlabel(list(p_base_scatter), pointdf)
+```
+
+
+
+```{r}
+p_base_density <- ggplot(mtcars, aes(x = mpg)) + geom_density() +
+  labs(x = "Miles/Gallon", y = NULL)
+
+af_lines <- function(plots, pointdf) {
+    map(plots, ~. + geom_vline(aes(xintercept = mpg), data = pointdf, color = 'red') +
+          geom_text_repel(aes(label = model), y = 0, data = pointdf, size = 3, angle = 90, nudge_x = -0.1))
+}
+ap_density <- af_lines(list(p_base_density), pointdf)
+ap_density
+```
+
+
+
+```{r}
+
+p_base_tile <- mtcars_labeled %>%
+  group_by(gear, carb) %>% 
+  summarise(n = n()) %>% ggplot(aes(x = gear, y = carb)) + 
+  geom_tile(aes(fill = n), height = 0.8, width = 0.8) +
+  labs(x = "Forward gears", y = "Carburetors") +
+  scale_fill_gradient(high = "black", low = "lightgray") +
+  theme(legend.position = 'none')
+
+af_highlightred <- function(plots, pointdf) {
+    map(plots, ~. + geom_point(data = pointdf, color = 'red'))
+}
+
+
+af_highlightlabelv <- function(plots, pointdf) {
+    map(plots, ~. + geom_point(data = pointdf, color = 'red') +
+          geom_label_repel(aes(label = model), data = pointdf, size = 3))
+}
+
+ap_tile <- af_highlightlabelv(list(p_base_tile), pointdf)
+ap_tile
+
+```
+
+
+
+```{r, fig.height = 5, fig.width = 9}
+p <- cowplot::plot_grid(
+  p_base_scatter, p_base_density,  p_base_tile,  
+  ap_scatter[[1]],  ap_density[[1]],ap_tile[[1]],
+  align = c("hv"),
+  ncol = 3,
+  labels = paste(rep(1:3, 2), rep(LETTERS[1:2], each = 3), sep = "")
+  )
+# ggsave("data-raw/ap_examples.png", plot = p, height = 5, width = 9)
+p
+```
+
+
+# Convenience functions
+
+```{r}
+annofun <- af_highlight(color = "red", geomfun = geom_point)
+annofun(list(p_base_scatter), pointdf)
+
+
+annofun <- af_highlight(color = "red",  geomfun = geom_point, shape = 8, size = 2)
+annofun(list(p_base_scatter), pointdf)
+
+
+annofun <- af_highlight(color = "red",  geomfun = geom_point, shape = 8, size = 2,
+                        label = model, with_label = T)
+annofun(list(p_base_scatter), pointdf)
+
+```
+
+
+```{r, eval = F}
+# does not work 
+annofun <- af_highlight(color = "red", geomfun = geom_point, size = cyl)
+annofun(list(p_base_scatter), pointdf)
+```
+
+
+```{r}
+annofun <- af_label(model, geomfun = ggrepel::geom_text_repel)
+annofun(list(p_base_scatter), pointdf)
+```
+
+
+
+```{r}
+annofun <- af_vlines(mpg)
+annofun(list(p_base_scatter), pointdf)
+
+annofun <- af_vlines(mpg, color = 'blue')
+annofun(list(p_base_scatter), pointdf)
+
+annofun <- af_vlines(mpg, color = 'blue', with_label = T, label = model, largs = list(y = 6))
+annofun(list(p_base_scatter), pointdf)
+
+
+```
